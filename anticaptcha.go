@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -140,8 +141,18 @@ func (c *Client) createTaskImage(imgString string) (float64, error) {
 	// Decode response
 	responseBody := make(map[string]interface{})
 	json.NewDecoder(resp.Body).Decode(&responseBody)
-	// TODO treat api errors and handle them properly
-	return responseBody["taskId"].(float64), nil
+
+	errorDescription, ok := responseBody["errorDescription"]
+	if ok {
+		return 0, fmt.Errorf("server returned: %s", errorDescription)
+	}
+
+	taskId, ok := responseBody["taskId"]
+	if !ok {
+		return 0, errors.New("failed to get a response")
+	}
+
+	return taskId.(float64), nil
 }
 
 // SendImage Method to encapsulate the processing of the image captcha
@@ -170,5 +181,16 @@ func (c *Client) SendImage(imgString string) (string, error) {
 			break
 		}
 	}
-	return response["solution"].(map[string]interface{})["text"].(string), nil
+
+	errorDescription, ok := response["errorDescription"]
+	if ok {
+		return "", fmt.Errorf("server returned: %s", errorDescription)
+	}
+
+	solution, ok := response["solution"]
+	if !ok {
+		return "", errors.New("failed to get a response")
+	}
+
+	return solution.(map[string]interface{})["text"].(string), nil
 }
