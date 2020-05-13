@@ -88,10 +88,10 @@ func (c *Client) getTaskResult(taskID float64) (map[string]interface{}, error) {
 // SendRecaptcha Method to encapsulate the processing of the recaptcha
 // Given a url and a key, it sends to the api and waits until
 // the processing is complete to return the evaluated key
-func (c *Client) SendRecaptcha(websiteURL string, recaptchaKey string, timeoutInterval time.Duration) (string, error) {
+func (c *Client) SendRecaptcha(websiteURL string, recaptchaKey string, timeoutInterval time.Duration) (string, float64, error) {
 	taskID, err := c.createTaskRecaptcha(websiteURL, recaptchaKey)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	check := time.NewTicker(10 * time.Second)
@@ -102,14 +102,14 @@ func (c *Client) SendRecaptcha(websiteURL string, recaptchaKey string, timeoutIn
 		case <-check.C:
 			response, err := c.getTaskResult(taskID)
 			if err != nil {
-				return "", err
+				return "", taskID, err
 			}
 			if response["status"] == "ready" {
-				return response["solution"].(map[string]interface{})["gRecaptchaResponse"].(string), nil
+				return response["solution"].(map[string]interface{})["gRecaptchaResponse"].(string), taskID, nil
 			}
 			check = time.NewTicker(checkInterval)
 		case <-timeout.C:
-			return "", errors.New("antiCaptcha check result timeout")
+			return "", taskID, errors.New("antiCaptcha check result timeout")
 		}
 	}
 }
@@ -193,4 +193,41 @@ func (c *Client) SendImage(imgString string) (string, error) {
 	}
 
 	return solution.(map[string]interface{})["text"].(string), nil
+}
+
+func (c *Client) Report(taskId float) (error) {
+	// Mount the data to be sent
+	body := map[string]interface{}{
+		"clientKey": c.APIKey,
+		"taskId": taskId,
+	}
+
+	b, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	// Make the request
+	u := baseURL.ResolveReference(&url.URL{Path: "/reportIncorrectRecaptcha"})
+	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Decode response
+	responseBody := make(map[string]interface{})
+	json.NewDecoder(resp.Body).Decode(&responseBody)
+
+	errorDescription, ok := responseBody["errorDescription"]
+	if ok {
+		return fmt.Errorf("server returned: %s", errorDescription)
+	}
+
+	taskId, ok := responseBody["taskId"]
+	if !ok {
+		return errors.New("failed to get a response")
+	}
+
+	return nil
 }
