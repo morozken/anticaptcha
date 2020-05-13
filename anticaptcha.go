@@ -224,10 +224,5 @@ func (c *Client) Report(taskId float) (error) {
 		return fmt.Errorf("server returned: %s", errorDescription)
 	}
 
-	taskId, ok := responseBody["taskId"]
-	if !ok {
-		return errors.New("failed to get a response")
-	}
-
 	return nil
 }
