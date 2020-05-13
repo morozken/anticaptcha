@@ -195,7 +195,7 @@ func (c *Client) SendImage(imgString string) (string, error) {
 	return solution.(map[string]interface{})["text"].(string), nil
 }
 
-func (c *Client) Report(taskId float) (error) {
+func (c *Client) Report(taskId float64) (error) {
 	// Mount the data to be sent
 	body := map[string]interface{}{
 		"clientKey": c.APIKey,
